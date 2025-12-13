@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  fastapi:
+    build: .
+    container_name: todo-fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./lab.db:/app/lab.db
