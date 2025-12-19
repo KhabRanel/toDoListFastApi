@@ -76,16 +76,6 @@ Base.metadata.create_all(engine)
 # --- Приложение ---
 app = FastAPI(title="TODO API (FastAPI + ORM)")
 
-# --- Подключаем статические файлы ---
-current_dir = os.path.dirname(__file__)
-static_dir = os.path.join(current_dir, "static")
-
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-# --- Главная страница ---
-@app.get("/", response_class=FileResponse, tags=["frontend"])
-def index():
-    return FileResponse(os.path.join(static_dir, "index.html"))
 
 # --- Валидация данных ---
 def validate_task(data: Dict[str, Any]):
@@ -95,13 +85,6 @@ def validate_task(data: Dict[str, Any]):
     # title
     if "title" not in data or not isinstance(data["title"], str) or len(data["title"].strip()) < 3:
         raise HTTPException(400, "Invalid or missing 'title'")
-
-    # priority
-    if "priority" in data:
-        if data["priority"] not in [1, 2, 3]:
-            raise HTTPException(400, "Priority must be 1, 2 or 3")
-    else:
-        data["priority"] = 1
 
     # is_done
     if "is_done" in data:
@@ -206,6 +189,7 @@ def create_task(payload: TaskCreate):
         session.refresh(obj)
         return obj
 
+
 # Обновить задачу
 @app.put("/tasks/{task_id}", response_model=TaskResponse)
 def update_task(task_id: int, payload: TaskUpdate):
@@ -216,14 +200,17 @@ def update_task(task_id: int, payload: TaskUpdate):
 
         data = payload.dict(exclude_unset=True)
 
-        merged = obj.to_dict() | data
-        validate_task(merged)
+        if "title" in data:
+            obj.title = data["title"]
+        if "details" in data:
+            obj.details = data["details"]
+        if "is_done" in data:
+            obj.is_done = int(bool(data["is_done"]))
+        if "priority" in data:
+            obj.priority = data["priority"]
+        if "due_date" in data:
+            obj.due_date = data["due_date"]
 
-        obj.title = merged["title"]
-        obj.details = merged.get("details")
-        obj.is_done = int(bool(merged.get("is_done")))
-        obj.priority = merged.get("priority", 1)
-        obj.due_date = merged.get("due_date")
         obj.updated_at = datetime.datetime.now().isoformat()
 
         session.commit()
@@ -240,4 +227,16 @@ def delete_task(task_id: int):
             raise HTTPException(404, "Task not found")
         session.delete(obj)
         session.commit()
+
+
+# --- Подключаем статические файлы ---
+current_dir = os.path.dirname(__file__)
+static_dir = os.path.join(current_dir, "static")
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# --- Главная страница ---
+@app.get("/", response_class=FileResponse, tags=["frontend"])
+def index():
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
